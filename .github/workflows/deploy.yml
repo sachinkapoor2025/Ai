@@ -37,7 +37,7 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t my-lambda-app ./ai
+        docker build -t Dockerfile ./ai
 
     - name: Tag Docker image
       run: |
