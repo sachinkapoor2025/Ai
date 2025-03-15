@@ -4,7 +4,7 @@ provider "aws" {
 
 # IAM Role for Lambda  
 resource "aws_iam_role" "lambda_execution_role" {
-  name = "lambda_execution_role"
+  name = "ai-fx-lambda_execution_role"
   
   assume_role_policy = <<EOF
 {
@@ -22,7 +22,7 @@ resource "aws_iam_role" "lambda_execution_role" {
 EOF
 }
 
-# Attach policies to Lambda role
+# Attach policies to Lambda role  
 resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   role       = aws_iam_role.lambda_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -34,8 +34,8 @@ resource "aws_iam_role_policy_attachment" "lambda_ecr_access" {
 }
 
 # Lambda Function using Docker Image
-resource "aws_lambda_function" "ai_bot" {
-  function_name     = "ai-bot"
+resource "aws_lambda_function" "ai_fx_bot" {
+  function_name     = "ai-fx-bot"
   role             = aws_iam_role.lambda_execution_role.arn
   package_type     = "Image"
   image_uri        = "985539754737.dkr.ecr.ap-southeast-2.amazonaws.com/ai:latest"
@@ -52,5 +52,5 @@ resource "aws_lambda_function" "ai_bot" {
 }
 
 output "lambda_function_name" {
-  value = aws_lambda_function.ai_bot.function_name
+  value = aws_lambda_function.ai_fx_bot.function_name
 }
