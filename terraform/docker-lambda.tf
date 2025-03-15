@@ -33,7 +33,7 @@ resource "aws_iam_role_policy_attachment" "lambda_ecr_access" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
-# Lambda Function using Docker Image
+# Lambda Function using Docker Image  
 resource "aws_lambda_function" "ai_fx_bot" {
   function_name     = "ai-fx-bot"
   role             = aws_iam_role.lambda_execution_role.arn
