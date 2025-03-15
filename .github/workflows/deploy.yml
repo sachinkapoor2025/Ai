@@ -37,11 +37,12 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t Dockerfile ./ai
+        cd ai
+        docker build -t ai-fx .
 
     - name: Tag Docker image
       run: |
-        docker tag my-lambda-app:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-2.amazonaws.com/my-lambda-repo:latest
+        docker tag ai-fx:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-2.amazonaws.com/ai-fx:latest
 
     - name: Push Docker image to ECR
       run: |
