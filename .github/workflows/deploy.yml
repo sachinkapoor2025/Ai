@@ -46,7 +46,7 @@ jobs:
 
     - name: Push Docker image to ECR
       run: |
-        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-2.amazonaws.com/my-lambda-repo:latest
+        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-2.amazonaws.com/ai-fx:latest
 
   deploy:
     runs-on: ubuntu-latest
