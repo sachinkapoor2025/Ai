@@ -3,7 +3,7 @@ provider "aws" {
   profile = "ai"
 }
 
-# IAM Role for Lambda
+# IAM Role for Lambda  
 resource "aws_iam_role" "lambda_execution_role" {
   name = "lambda_execution_role"
   
