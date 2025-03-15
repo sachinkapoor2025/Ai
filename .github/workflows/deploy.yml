@@ -37,7 +37,7 @@ jobs:
 
     - name: Build Docker image
       run: |
-        cd ai
+        cd ai-fx
         docker build -t ai-fx .
 
     - name: Tag Docker image
