@@ -1,7 +1,6 @@
 provider "aws" {
   region  = "ap-southeast-2"
-  profile = "ai"
-}
+  }
 
 # IAM Role for Lambda  
 resource "aws_iam_role" "lambda_execution_role" {
