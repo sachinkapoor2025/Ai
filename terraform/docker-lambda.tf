@@ -1,7 +1,3 @@
-provider "aws" {
-  region  = "ap-southeast-2"
-  }
-
 # IAM Role for Lambda  
 resource "aws_iam_role" "lambda_execution_role" {
   name = "ai-fx-lambda_execution_role"
