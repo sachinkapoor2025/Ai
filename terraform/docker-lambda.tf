@@ -38,7 +38,7 @@ resource "aws_lambda_function" "ai_fx_bot" {
   function_name     = "ai-fx-bot"
   role             = aws_iam_role.lambda_execution_role.arn
   package_type     = "Image"
-  image_uri        = "985539754737.dkr.ecr.ap-southeast-2.amazonaws.com/ai:latest"
+  image_uri        = "985539754737.dkr.ecr.ap-southeast-2.amazonaws.com/ai-fx:latest"
   timeout          = 900 # 15 minutes (max for Lambda)
   memory_size      = 512
 

@@ -90,4 +90,4 @@ jobs:
 
     - name: Verify Lambda Deployment
       run: |
-        aws lambda get-function --function-name my-lambda-function
+        aws lambda get-function --function-name my-lambda-function --region ap-southeast-2
