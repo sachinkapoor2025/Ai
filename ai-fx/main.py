@@ -76,60 +76,58 @@ def lambda_handler(event, context):
         oanda = tpqoa.tpqoa(cfg)
         print("[INFO] OANDA connection established.")
 
-        # Step 3: Choose Instrument
-        instrument = os.getenv("TRADE_INSTRUMENT", "EUR_USD")
+        # Step 3: Fetch All Available Instruments (Currency Pairs)
         available_instruments = [inst[1] for inst in oanda.get_instruments()]
+        print(f"[INFO] Available Instruments: {available_instruments}")
 
-        if instrument not in available_instruments:
-            print(f"[WARNING] Invalid instrument selected: {instrument}. Defaulting to EUR_USD.")
-            instrument = "EUR_USD"
+        # Step 4: Iterate Through All Available Currency Pairs and Store Data
+        for instrument in available_instruments:
+            print(f"[INFO] Processing trade log for {instrument}...")
 
-        print(f"[INFO] Instrument Selected: {instrument}")
+            # Step 5: Trading Mode Selection (Live or Backtesting)
+            mode = os.getenv("TRADING_MODE", "1")  # "1" = Live, "2" = Backtest
+            if mode not in ["1", "2"]:
+                print(f"[WARNING] Invalid mode selected: {mode}. Defaulting to Live Trading.")
+                mode = "1"
 
-        # Step 4: Trading Mode Selection
-        mode = os.getenv("TRADING_MODE", "1")  # "1" = Live, "2" = Backtest
-        if mode not in ["1", "2"]:
-            print(f"[WARNING] Invalid mode selected: {mode}. Defaulting to Live Trading.")
-            mode = "1"
+            print(f"[INFO] Trading Mode: {'Live' if mode == '1' else 'Backtesting'}")
 
-        print(f"[INFO] Trading Mode: {'Live' if mode == '1' else 'Backtesting'}")
+            # Step 6: Select Strategy
+            strategy = os.getenv("STRATEGY", "sma").lower()
+            available_strategies = ["sma", "bollinger_bands", "contrarian", "momentum", "ml_classification"]
 
-        # Step 5: Select Strategy
-        strategy = os.getenv("STRATEGY", "sma").lower()
-        available_strategies = ["sma", "bollinger_bands", "contrarian", "momentum", "ml_classification"]
+            if strategy not in available_strategies:
+                print(f"[WARNING] Invalid strategy selected: {strategy}. Defaulting to SMA.")
+                strategy = "sma"
 
-        if strategy not in available_strategies:
-            print(f"[WARNING] Invalid strategy selected: {strategy}. Defaulting to SMA.")
-            strategy = "sma"
+            print(f"[INFO] Selected Strategy: {strategy}")
 
-        print(f"[INFO] Selected Strategy: {strategy}")
+            granularity = os.getenv("GRANULARITY", "1hr")
+            units = int(os.getenv("UNITS", "100000"))
+            stop_profit = os.getenv("STOP_PROFIT", "0")
+            stop_loss = os.getenv("STOP_LOSS", "0")
 
-        granularity = os.getenv("GRANULARITY", "1hr")
-        units = int(os.getenv("UNITS", "100000"))
-        stop_profit = os.getenv("STOP_PROFIT", "0")
-        stop_loss = os.getenv("STOP_LOSS", "0")
+            # Convert stop values to float or None
+            stop_profit = None if stop_profit == "n" else float(stop_profit)
+            stop_loss = None if stop_loss == "n" else float(stop_loss)
 
-        # Convert stop values to float or None
-        stop_profit = None if stop_profit == "n" else float(stop_profit)
-        stop_loss = None if stop_loss == "n" else float(stop_loss)
+            print(f"[INFO] Granularity: {granularity}, Units: {units}, Stop Profit: {stop_profit}, Stop Loss: {stop_loss}")
 
-        print(f"[INFO] Granularity: {granularity}, Units: {units}, Stop Profit: {stop_profit}, Stop Loss: {stop_loss}")
+            # Example Trade Data (Replace with real trade data)
+            trade_data = {
+                "Strategy": strategy,
+                "Granularity": granularity,
+                "Units": units,
+                "StopProfit": stop_profit,
+                "StopLoss": stop_loss
+            }
 
-        # Example Trade Data (Replace with real trade data)
-        trade_data = {
-            "Strategy": strategy,
-            "Granularity": granularity,
-            "Units": units,
-            "StopProfit": stop_profit,
-            "StopLoss": stop_loss
-        }
-
-        # Write trade log to DynamoDB
-        print(f"[INFO] Writing trade log for {instrument}...")
-        write_trade_log(trade_id="T12345", currency_pair=instrument, trade_data=trade_data)
+            # Write trade log to DynamoDB
+            print(f"[INFO] Writing trade log for {instrument}...")
+            write_trade_log(trade_id=f"T{int(datetime.utcnow().timestamp())}", currency_pair=instrument, trade_data=trade_data)
 
         print("[INFO] Lambda function execution completed successfully.")
-        return {"status": "Success", "mode": mode, "instrument": instrument}
+        return {"status": "Success", "processed_currency_pairs": available_instruments}
 
     except Exception as e:
         print(f"[ERROR] Lambda function failed: {str(e)}")
