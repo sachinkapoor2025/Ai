@@ -51,16 +51,17 @@ def convert_floats_to_decimal(data):
     else:
         return data
 
-def fetch_market_data(oanda, instrument, granularity="M1"):
+def fetch_market_data(oanda, instrument, granularity="M1", price="M"):
     """ Fetch historical market data from OANDA for the given instrument. """
     print(f"[INFO] Fetching market data for {instrument}...")
 
-    # ✅ Correcting `get_history()` call (Replacing `count` with `start` and `end`)
+    # ✅ Correct `get_history()` call by adding `price="M"` parameter
     data = oanda.get_history(
         instrument=instrument,
         granularity=granularity,
         start=(datetime.utcnow() - timedelta(days=1)).isoformat(),
-        end=datetime.utcnow().isoformat()
+        end=datetime.utcnow().isoformat(),
+        price=price  # ✅ Added price parameter (Mid Prices)
     )
 
     # Convert to DataFrame
