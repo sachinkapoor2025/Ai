@@ -11,15 +11,15 @@ RUN apt-get update && apt-get install -y \
     tar \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and build TA-Lib manually
-RUN wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz -O /tmp/ta-lib.tar.gz \
+# Install TA-Lib using a reliable source
+RUN wget https://github.com/TA-Lib/ta-lib/archive/refs/tags/0.4.0.tar.gz -O /tmp/ta-lib.tar.gz \
     && tar -xzf /tmp/ta-lib.tar.gz -C /tmp/ \
     && cd /tmp/ta-lib-0.4.0/ \
     && ./configure --prefix=/usr \
     && make \
     && make install \
     && rm -rf /tmp/ta-lib*
-    
+        
 # Set working directory
 WORKDIR /app
 
