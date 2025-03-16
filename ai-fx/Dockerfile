@@ -14,5 +14,8 @@ COPY . .
 # Install tpqoa from local directory
 RUN pip install ./tpqoa
 
-# Command to run the bot
-CMD ["python", "main.py"]
+# Install AWS Lambda Runtime Interface Client
+RUN pip install --no-cache-dir awslambdaric
+
+# Set Lambda entry point
+CMD ["python", "-m", "awslambdaric", "main.lambda_handler"]
