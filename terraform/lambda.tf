@@ -19,7 +19,7 @@ resource "aws_lambda_function" "ai_fx_bot" {
   image_uri = "${data.aws_ecr_repository.ai_fx.repository_url}@${data.aws_ecr_image.latest_ai_fx_image.image_digest}"
 
   timeout          = 900  # 15 minutes (max for Lambda)
-  memory_size      = 1024 # Increased to 1GB for better performance
+  memory_size      = 2048 # Increased to 2GB for better performance
 
   environment {
     variables = {
