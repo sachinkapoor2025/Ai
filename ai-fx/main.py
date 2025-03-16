@@ -56,25 +56,34 @@ def fetch_market_data(oanda, instrument, granularity="M1", price="M"):
     print(f"[INFO] Fetching market data for {instrument}...")
 
     # ✅ Properly format timestamps (OANDA requires ISO 8601 WITHOUT microseconds)
-    start_time = (datetime.utcnow() - timedelta(days=1)).replace(microsecond=0).isoformat() + "Z"
+    start_time = (datetime.utcnow() - timedelta(hours=12)).replace(microsecond=0).isoformat() + "Z"
     end_time = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
     print(f"[INFO] Fetching data from {start_time} to {end_time}")
 
-    # ✅ Correct API request with properly formatted timestamps
-    data = oanda.get_history(
-        instrument=instrument,
-        granularity=granularity,
-        start=start_time,
-        end=end_time,
-        price=price  # ✅ Ensures Mid Prices (M)
-    )
+    try:
+        # ✅ Correct API request with properly formatted timestamps
+        data = oanda.get_history(
+            instrument=instrument,
+            granularity=granularity,
+            start=start_time,
+            end=end_time,
+            price=price  # ✅ Ensures Mid Prices (M)
+        )
 
-    # Convert to DataFrame
-    df = pd.DataFrame(data)
-    df.set_index("time", inplace=True)
-    return df
-        
+        # ✅ Ensure 'candles' exist in response before processing
+        if "candles" not in data:
+            raise ValueError(f"[ERROR] OANDA response missing 'candles' field for {instrument}.")
+
+        # Convert to DataFrame
+        df = pd.DataFrame(data["candles"])  # ✅ Fix: Ensure we reference "candles"
+        df.set_index("time", inplace=True)
+        return df
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch market data for {instrument}: {str(e)}")
+        return None
+
 def calculate_technical_indicators(df):
     """ Calculate key technical indicators using pandas_ta and return as a dictionary. """
     print("[INFO] Calculating technical indicators...")
@@ -120,15 +129,6 @@ def write_trade_log(trade_id, currency_pair, trade_data):
     # ✅ Convert float values to Decimal
     trade_data = convert_floats_to_decimal(trade_data)
 
-    # ✅ Wait for table status to be "ACTIVE" before writing data
-    while True:
-        response = dynamodb.describe_table(TableName=table_name)
-        table_status = response["Table"]["TableStatus"]
-        if table_status == "ACTIVE":
-            break
-        print(f"[INFO] Waiting for table {table_name} to be ready for writing...")
-        time.sleep(2)
-
     table.put_item(Item=trade_data)
     print(f"[INFO] Trade log written to {table_name}: {trade_data}")
 
@@ -155,6 +155,12 @@ def lambda_handler(event, context):
 
             # Fetch market data and calculate indicators
             df = fetch_market_data(oanda, instrument)
+
+            # ✅ Skip instrument if market data is missing
+            if df is None or df.empty:
+                print(f"[WARNING] No market data available for {instrument}. Skipping...")
+                continue
+
             indicators = calculate_technical_indicators(df)
 
             trade_data = {
@@ -170,8 +176,7 @@ def lambda_handler(event, context):
                 "BB_Lower": indicators["BB_Lower"]
             }
 
-            # Write trade log to DynamoDB
-            write_trade_log(trade_id=f"T{int(datetime.utcnow().timestamp())}", currency_pair=instrument, trade_data=trade_data)
+            write_trade_log(f"T{int(datetime.utcnow().timestamp())}", instrument, trade_data)
 
         print("[INFO] Lambda function execution completed successfully.")
         return {"status": "Success", "processed_currency_pairs": available_instruments}
