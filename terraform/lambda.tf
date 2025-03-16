@@ -1,11 +1,21 @@
-# AWS ECR Repository
-resource "aws_ecr_repository" "ai_fx" {
+# Check if the ECR repository already exists
+data "aws_ecr_repository" "existing_ai_fx" {
   name = "ai-fx"
 }
 
-# Fetch latest ECR image
+# Create ECR repository only if it doesn't exist
+resource "aws_ecr_repository" "ai_fx" {
+  name = "ai-fx"
+  
+  # Prevent Terraform from recreating the repository if it already exists
+  lifecycle {
+    ignore_changes = [name]
+  }
+}
+
+# Fetch the latest ECR image
 data "aws_ecr_image" "latest_ai_fx_image" {
-  repository_name = aws_ecr_repository.ai_fx.name
+  repository_name = data.aws_ecr_repository.existing_ai_fx.name
   most_recent     = true
 }
 
@@ -16,7 +26,7 @@ resource "aws_lambda_function" "ai_fx_bot" {
   package_type     = "Image"
 
   # Use the latest image digest
-  image_uri = "${aws_ecr_repository.ai_fx.repository_url}@${data.aws_ecr_image.latest_ai_fx_image.image_digest}"
+  image_uri = "${data.aws_ecr_repository.existing_ai_fx.repository_url}@${data.aws_ecr_image.latest_ai_fx_image.image_digest}"
 
   timeout          = 900  # 15 minutes (max for Lambda)
   memory_size      = 1024 # Increased to 1GB for better performance
