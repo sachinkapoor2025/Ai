@@ -3,6 +3,7 @@ import boto3
 import tpqoa
 from datetime import datetime
 import time
+from decimal import Decimal  # ✅ Import Decimal for DynamoDB compatibility
 
 # Initialize AWS Clients
 dynamodb = boto3.client('dynamodb')
@@ -17,7 +18,7 @@ def check_or_create_table(currency_pair):
         print(f"[INFO] Table {table_name} already exists.")
     except dynamodb.exceptions.ResourceNotFoundException:
         print(f"[INFO] Table {table_name} does not exist. Creating it now...")
-        
+
         # Create the table
         dynamodb.create_table(
             TableName=table_name,
@@ -25,7 +26,7 @@ def check_or_create_table(currency_pair):
             AttributeDefinitions=[{"AttributeName": "TradeID", "AttributeType": "S"}],
             BillingMode="PAY_PER_REQUEST"
         )
-        
+
         # Wait until table is created
         while True:
             try:
@@ -35,14 +36,29 @@ def check_or_create_table(currency_pair):
             except dynamodb.exceptions.ResourceNotFoundException:
                 time.sleep(2)
 
+def convert_floats_to_decimal(data):
+    """ Recursively converts all float values to Decimal (DynamoDB Requirement). """
+    if isinstance(data, float):
+        return Decimal(str(data))  # Convert float to string first to avoid precision issues
+    elif isinstance(data, dict):
+        return {k: convert_floats_to_decimal(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [convert_floats_to_decimal(i) for i in data]
+    else:
+        return data
+
 def write_trade_log(trade_id, currency_pair, trade_data):
     """ Write trade logs to the corresponding DynamoDB table. """
     table_name = f"fx-trading-{currency_pair}"
     check_or_create_table(currency_pair)  # Ensure the table exists
-    
+
     table = dynamodb_resource.Table(table_name)
+
     trade_data["TradeID"] = trade_id
     trade_data["Timestamp"] = int(datetime.utcnow().timestamp())
+
+    # ✅ Convert float values to Decimal
+    trade_data = convert_floats_to_decimal(trade_data)
 
     table.put_item(Item=trade_data)
     print(f"[INFO] Trade log written to {table_name}: {trade_data}")
@@ -63,7 +79,7 @@ def lambda_handler(event, context):
         # Step 3: Choose Instrument
         instrument = os.getenv("TRADE_INSTRUMENT", "EUR_USD")
         available_instruments = [inst[1] for inst in oanda.get_instruments()]
-        
+
         if instrument not in available_instruments:
             print(f"[WARNING] Invalid instrument selected: {instrument}. Defaulting to EUR_USD.")
             instrument = "EUR_USD"
