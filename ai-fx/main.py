@@ -27,14 +27,15 @@ def check_or_create_table(currency_pair):
             BillingMode="PAY_PER_REQUEST"
         )
 
-        # Wait until table is created
+        # Wait until the table is fully created before proceeding
         while True:
-            try:
-                dynamodb.describe_table(TableName=table_name)
-                print(f"[INFO] Table {table_name} successfully created.")
+            response = dynamodb.describe_table(TableName=table_name)
+            table_status = response["Table"]["TableStatus"]
+            if table_status == "ACTIVE":
+                print(f"[INFO] Table {table_name} is now ACTIVE and ready for writes.")
                 break
-            except dynamodb.exceptions.ResourceNotFoundException:
-                time.sleep(2)
+            print(f"[INFO] Waiting for table {table_name} to become ACTIVE...")
+            time.sleep(2)  # Wait 2 seconds before checking again
 
 def convert_floats_to_decimal(data):
     """ Recursively converts all float values to Decimal (DynamoDB Requirement). """
@@ -59,6 +60,15 @@ def write_trade_log(trade_id, currency_pair, trade_data):
 
     # ✅ Convert float values to Decimal
     trade_data = convert_floats_to_decimal(trade_data)
+
+    # ✅ Wait for table status to be "ACTIVE" before writing data
+    while True:
+        response = dynamodb.describe_table(TableName=table_name)
+        table_status = response["Table"]["TableStatus"]
+        if table_status == "ACTIVE":
+            break
+        print(f"[INFO] Waiting for table {table_name} to be ready for writing...")
+        time.sleep(2)
 
     table.put_item(Item=trade_data)
     print(f"[INFO] Trade log written to {table_name}: {trade_data}")
