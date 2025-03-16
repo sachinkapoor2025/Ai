@@ -1,51 +1,93 @@
 import os
+import boto3
 import tpqoa
 from datetime import datetime
+import time
 
-from livetrading.BollingerBandsLive import BollingerBandsLive
-from livetrading.ContrarianLive import ContrarianLive
-from livetrading.MLClassificationLive import MLClassificationLive
-from livetrading.MomentumLive import MomentumLive
-from livetrading.SMALive import SMALive
+# Initialize AWS Clients
+dynamodb = boto3.client('dynamodb')
+dynamodb_resource = boto3.resource('dynamodb')
 
-from backtesting.ContrarianBacktest import ContrarianBacktest
-from backtesting.BollingerBandsBacktest import BollingerBandsBacktest
-from backtesting.MomentumBacktest import MomentumBacktest
-from backtesting.SMABacktest import SMABacktest
-from backtesting.MLClassificationBacktest import MLClassificationBacktest
+def check_or_create_table(currency_pair):
+    """ Check if the table exists, and create it if it doesn't. """
+    table_name = f"fx-trading-{currency_pair}"
+    try:
+        # Check if table exists
+        dynamodb.describe_table(TableName=table_name)
+        print(f"[INFO] Table {table_name} already exists.")
+    except dynamodb.exceptions.ResourceNotFoundException:
+        print(f"[INFO] Table {table_name} does not exist. Creating it now...")
+        
+        # Create the table
+        dynamodb.create_table(
+            TableName=table_name,
+            KeySchema=[{"AttributeName": "TradeID", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "TradeID", "AttributeType": "S"}],
+            BillingMode="PAY_PER_REQUEST"
+        )
+        
+        # Wait until table is created
+        while True:
+            try:
+                dynamodb.describe_table(TableName=table_name)
+                print(f"[INFO] Table {table_name} successfully created.")
+                break
+            except dynamodb.exceptions.ResourceNotFoundException:
+                time.sleep(2)
+
+def write_trade_log(trade_id, currency_pair, trade_data):
+    """ Write trade logs to the corresponding DynamoDB table. """
+    table_name = f"fx-trading-{currency_pair}"
+    check_or_create_table(currency_pair)  # Ensure the table exists
+    
+    table = dynamodb_resource.Table(table_name)
+    trade_data["TradeID"] = trade_id
+    trade_data["Timestamp"] = int(datetime.utcnow().timestamp())
+
+    table.put_item(Item=trade_data)
+    print(f"[INFO] Trade log written to {table_name}: {trade_data}")
 
 def lambda_handler(event, context):
     """ AWS Lambda-compatible entry point """
+    try:
+        print("[INFO] Lambda function started.")
 
-    # Step 1: Ensure OANDA Configuration File
-    cfg = "oanda.cfg"
-    
-    # Step 2: Open OANDA Connection
-    oanda = tpqoa.tpqoa(cfg)
+        # Step 1: Ensure OANDA Configuration File
+        cfg = "oanda.cfg"
+        print(f"[INFO] Using OANDA config file: {cfg}")
 
-    # Step 3: Choose Instrument from ENV
-    instrument = os.getenv("TRADE_INSTRUMENT", "EUR_USD")
-    available_instruments = [inst[1] for inst in oanda.get_instruments()]
-    
-    if instrument not in available_instruments:
-        instrument = "EUR_USD"  # Default if invalid instrument is provided
-    
-    print(f"Instrument Selected: {instrument}")
+        # Step 2: Open OANDA Connection
+        oanda = tpqoa.tpqoa(cfg)
+        print("[INFO] OANDA connection established.")
 
-    # Step 4: Trading Mode Selection
-    mode = os.getenv("TRADING_MODE", "1")  # "1" = Live, "2" = Backtest
+        # Step 3: Choose Instrument
+        instrument = os.getenv("TRADE_INSTRUMENT", "EUR_USD")
+        available_instruments = [inst[1] for inst in oanda.get_instruments()]
+        
+        if instrument not in available_instruments:
+            print(f"[WARNING] Invalid instrument selected: {instrument}. Defaulting to EUR_USD.")
+            instrument = "EUR_USD"
 
-    if mode not in ["1", "2"]:
-        mode = "1"  # Default to Live Trading
+        print(f"[INFO] Instrument Selected: {instrument}")
 
-    # Step 5: Select Strategy
-    if mode == "1":  # Live Trading
+        # Step 4: Trading Mode Selection
+        mode = os.getenv("TRADING_MODE", "1")  # "1" = Live, "2" = Backtest
+        if mode not in ["1", "2"]:
+            print(f"[WARNING] Invalid mode selected: {mode}. Defaulting to Live Trading.")
+            mode = "1"
+
+        print(f"[INFO] Trading Mode: {'Live' if mode == '1' else 'Backtesting'}")
+
+        # Step 5: Select Strategy
         strategy = os.getenv("STRATEGY", "sma").lower()
         available_strategies = ["sma", "bollinger_bands", "contrarian", "momentum", "ml_classification"]
 
         if strategy not in available_strategies:
-            strategy = "sma"  # Default to SMA Strategy
-        
+            print(f"[WARNING] Invalid strategy selected: {strategy}. Defaulting to SMA.")
+            strategy = "sma"
+
+        print(f"[INFO] Selected Strategy: {strategy}")
+
         granularity = os.getenv("GRANULARITY", "1hr")
         units = int(os.getenv("UNITS", "100000"))
         stop_profit = os.getenv("STOP_PROFIT", "0")
@@ -55,64 +97,24 @@ def lambda_handler(event, context):
         stop_profit = None if stop_profit == "n" else float(stop_profit)
         stop_loss = None if stop_loss == "n" else float(stop_loss)
 
-        # Initialize Trading Strategy
-        if strategy == "sma":
-            smas = int(os.getenv("SMAS", "9"))
-            smal = int(os.getenv("SMAL", "20"))
-            trader = SMALive(cfg, instrument, granularity, smas, smal, units, stop_loss=stop_loss, stop_profit=stop_profit)
+        print(f"[INFO] Granularity: {granularity}, Units: {units}, Stop Profit: {stop_profit}, Stop Loss: {stop_loss}")
 
-        elif strategy == "bollinger_bands":
-            sma = int(os.getenv("SMA", "9"))
-            deviation = int(os.getenv("DEVIATION", "2"))
-            trader = BollingerBandsLive(cfg, instrument, granularity, sma, deviation, units, stop_loss=stop_loss, stop_profit=stop_profit)
+        # Example Trade Data (Replace with real trade data)
+        trade_data = {
+            "Strategy": strategy,
+            "Granularity": granularity,
+            "Units": units,
+            "StopProfit": stop_profit,
+            "StopLoss": stop_loss
+        }
 
-        elif strategy == "momentum":
-            window = int(os.getenv("WINDOW", "3"))
-            trader = MomentumLive(cfg, instrument, granularity, window, units, stop_loss=stop_loss, stop_profit=stop_profit)
+        # Write trade log to DynamoDB
+        print(f"[INFO] Writing trade log for {instrument}...")
+        write_trade_log(trade_id="T12345", currency_pair=instrument, trade_data=trade_data)
 
-        elif strategy == "contrarian":
-            window = int(os.getenv("WINDOW", "3"))
-            trader = ContrarianLive(cfg, instrument, granularity, window, units, stop_loss=stop_loss, stop_profit=stop_profit)
+        print("[INFO] Lambda function execution completed successfully.")
+        return {"status": "Success", "mode": mode, "instrument": instrument}
 
-        elif strategy == "ml_classification":
-            lags = int(os.getenv("LAGS", "6"))
-            trader = MLClassificationLive(cfg, instrument, granularity, lags, units, stop_loss=stop_loss, stop_profit=stop_profit)
-
-        print(f"Live Trading Started with {strategy} strategy on {instrument}")
-
-    else:  # Backtesting
-        strategy = os.getenv("STRATEGY", "sma").lower()
-        available_backtest_strategies = ["sma", "bollinger_bands", "contrarian", "momentum", "ml_classification"]
-
-        if strategy not in available_backtest_strategies:
-            strategy = "sma"  # Default to SMA
-
-        start_date = os.getenv("START_DATE", "2024-01-01")
-        end_date = os.getenv("END_DATE", "2024-12-31")
-        trading_cost = float(os.getenv("TRADING_COST", "0.00007"))
-        granularity = os.getenv("GRANULARITY", "H1")
-
-        if strategy == "sma":
-            smas = int(os.getenv("SMAS", "9"))
-            smal = int(os.getenv("SMAL", "20"))
-            trader = SMABacktest(instrument, start_date, end_date, smas, smal, granularity, trading_cost)
-
-        elif strategy == "bollinger_bands":
-            sma = int(os.getenv("SMA", "9"))
-            deviation = int(os.getenv("DEVIATION", "2"))
-            trader = BollingerBandsBacktest(instrument, start_date, end_date, sma, deviation, granularity, trading_cost)
-
-        elif strategy == "momentum":
-            window = int(os.getenv("WINDOW", "3"))
-            trader = MomentumBacktest(instrument, start_date, end_date, window, granularity, trading_cost)
-
-        elif strategy == "contrarian":
-            window = int(os.getenv("WINDOW", "3"))
-            trader = ContrarianBacktest(instrument, start_date, end_date, window, granularity, trading_cost)
-
-        elif strategy == "ml_classification":
-            trader = MLClassificationBacktest(instrument, start_date, end_date, granularity, trading_cost)
-
-        print(f"Backtesting Started with {strategy} strategy on {instrument}")
-
-    return {"status": "Success", "mode": mode, "strategy": strategy, "instrument": instrument}
+    except Exception as e:
+        print(f"[ERROR] Lambda function failed: {str(e)}")
+        return {"status": "Failed", "error": str(e)}
