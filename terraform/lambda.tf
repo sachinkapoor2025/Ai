@@ -1,21 +1,6 @@
-# Check if the ECR repository already exists
-data "aws_ecr_repository" "existing_ai_fx" {
-  name = "ai-fx"
-}
-
-# Create ECR repository only if it doesn't exist
-resource "aws_ecr_repository" "ai_fx" {
-  name = "ai-fx"
-  
-  # Prevent Terraform from recreating the repository if it already exists
-  lifecycle {
-    ignore_changes = [name]
-  }
-}
-
 # Fetch the latest ECR image
 data "aws_ecr_image" "latest_ai_fx_image" {
-  repository_name = data.aws_ecr_repository.existing_ai_fx.name
+  repository_name = ai-fx
   most_recent     = true
 }
 
