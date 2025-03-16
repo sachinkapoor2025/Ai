@@ -55,26 +55,26 @@ def fetch_market_data(oanda, instrument, granularity="M1", price="M"):
     """ Fetch historical market data from OANDA for the given instrument. """
     print(f"[INFO] Fetching market data for {instrument}...")
 
-    # ✅ Correct timestamp format (ISO 8601, UTC, without microseconds)
+    # ✅ Properly format timestamps (OANDA requires ISO 8601 WITHOUT microseconds)
     start_time = (datetime.utcnow() - timedelta(days=1)).replace(microsecond=0).isoformat() + "Z"
     end_time = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
     print(f"[INFO] Fetching data from {start_time} to {end_time}")
 
-    # ✅ Corrected API request with properly formatted timestamps
+    # ✅ Correct API request with properly formatted timestamps
     data = oanda.get_history(
         instrument=instrument,
         granularity=granularity,
         start=start_time,
         end=end_time,
-        price=price  # ✅ Added price parameter (Mid Prices)
+        price=price  # ✅ Ensures Mid Prices (M)
     )
 
     # Convert to DataFrame
     df = pd.DataFrame(data)
     df.set_index("time", inplace=True)
     return df
-    
+        
 def calculate_technical_indicators(df):
     """ Calculate key technical indicators using pandas_ta and return as a dictionary. """
     print("[INFO] Calculating technical indicators...")
