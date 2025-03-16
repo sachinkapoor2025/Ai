@@ -1,12 +1,9 @@
 import os
 import boto3
 import tpqoa
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 import time
 from decimal import Decimal  # ✅ Import Decimal for DynamoDB compatibility
-import talib  # ✅ Technical Indicators Library
 
 # Initialize AWS Clients
 dynamodb = boto3.client('dynamodb')
@@ -38,7 +35,7 @@ def check_or_create_table(currency_pair):
                 print(f"[INFO] Table {table_name} is now ACTIVE and ready for writes.")
                 break
             print(f"[INFO] Waiting for table {table_name} to become ACTIVE...")
-            time.sleep(2)
+            time.sleep(2)  # Wait 2 seconds before checking again
 
 def convert_floats_to_decimal(data):
     """ Recursively converts all float values to Decimal (DynamoDB Requirement). """
@@ -50,48 +47,6 @@ def convert_floats_to_decimal(data):
         return [convert_floats_to_decimal(i) for i in data]
     else:
         return data
-
-def fetch_market_data(oanda, instrument, granularity="M1", count=100):
-    """ Fetch historical market data from OANDA for the given instrument. """
-    print(f"[INFO] Fetching market data for {instrument}...")
-    data = oanda.get_history(instrument=instrument, granularity=granularity, count=count)
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(data)
-    df.set_index("time", inplace=True)
-    return df
-
-def calculate_technical_indicators(df):
-    """ Calculate key technical indicators and return as a dictionary. """
-    print("[INFO] Calculating technical indicators...")
-
-    # Convert prices to numpy arrays for TA-Lib calculations
-    df["close"] = df["closeMid"].astype(float)
-    df["high"] = df["highMid"].astype(float)
-    df["low"] = df["lowMid"].astype(float)
-    df["open"] = df["openMid"].astype(float)
-
-    indicators = {}
-
-    # Moving Averages
-    indicators["SMA_20"] = talib.SMA(df["close"], timeperiod=20)[-1]
-    indicators["SMA_50"] = talib.SMA(df["close"], timeperiod=50)[-1]
-    indicators["EMA_20"] = talib.EMA(df["close"], timeperiod=20)[-1]
-
-    # RSI (Relative Strength Index)
-    indicators["RSI_14"] = talib.RSI(df["close"], timeperiod=14)[-1]
-
-    # MACD (Moving Average Convergence Divergence)
-    macd, macdsignal, macdhist = talib.MACD(df["close"], fastperiod=12, slowperiod=26, signalperiod=9)
-    indicators["MACD"] = macd[-1]
-    indicators["MACD_Signal"] = macdsignal[-1]
-
-    # Bollinger Bands
-    upper, middle, lower = talib.BBANDS(df["close"], timeperiod=20)
-    indicators["BB_Upper"] = upper[-1]
-    indicators["BB_Lower"] = lower[-1]
-
-    return indicators
 
 def write_trade_log(trade_id, currency_pair, trade_data):
     """ Write trade logs to the corresponding DynamoDB table. """
@@ -139,24 +94,46 @@ def lambda_handler(event, context):
         for instrument in available_instruments:
             print(f"[INFO] Processing trade log for {instrument}...")
 
-            # Fetch market data and calculate indicators
-            df = fetch_market_data(oanda, instrument)
-            indicators = calculate_technical_indicators(df)
+            # Step 5: Trading Mode Selection (Live or Backtesting)
+            mode = os.getenv("TRADING_MODE", "1")  # "1" = Live, "2" = Backtest
+            if mode not in ["1", "2"]:
+                print(f"[WARNING] Invalid mode selected: {mode}. Defaulting to Live Trading.")
+                mode = "1"
 
+            print(f"[INFO] Trading Mode: {'Live' if mode == '1' else 'Backtesting'}")
+
+            # Step 6: Select Strategy
+            strategy = os.getenv("STRATEGY", "sma").lower()
+            available_strategies = ["sma", "bollinger_bands", "contrarian", "momentum", "ml_classification"]
+
+            if strategy not in available_strategies:
+                print(f"[WARNING] Invalid strategy selected: {strategy}. Defaulting to SMA.")
+                strategy = "sma"
+
+            print(f"[INFO] Selected Strategy: {strategy}")
+
+            granularity = os.getenv("GRANULARITY", "1hr")
+            units = int(os.getenv("UNITS", "100000"))
+            stop_profit = os.getenv("STOP_PROFIT", "0")
+            stop_loss = os.getenv("STOP_LOSS", "0")
+
+            # Convert stop values to float or None
+            stop_profit = None if stop_profit == "n" else float(stop_profit)
+            stop_loss = None if stop_loss == "n" else float(stop_loss)
+
+            print(f"[INFO] Granularity: {granularity}, Units: {units}, Stop Profit: {stop_profit}, Stop Loss: {stop_loss}")
+
+            # Example Trade Data (Replace with real trade data)
             trade_data = {
-                "Instrument": instrument,
-                "Granularity": "M1",
-                "SMA_20": indicators["SMA_20"],
-                "SMA_50": indicators["SMA_50"],
-                "EMA_20": indicators["EMA_20"],
-                "RSI_14": indicators["RSI_14"],
-                "MACD": indicators["MACD"],
-                "MACD_Signal": indicators["MACD_Signal"],
-                "BB_Upper": indicators["BB_Upper"],
-                "BB_Lower": indicators["BB_Lower"]
+                "Strategy": strategy,
+                "Granularity": granularity,
+                "Units": units,
+                "StopProfit": stop_profit,
+                "StopLoss": stop_loss
             }
 
             # Write trade log to DynamoDB
+            print(f"[INFO] Writing trade log for {instrument}...")
             write_trade_log(trade_id=f"T{int(datetime.utcnow().timestamp())}", currency_pair=instrument, trade_data=trade_data)
 
         print("[INFO] Lambda function execution completed successfully.")

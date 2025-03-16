@@ -5,7 +5,3 @@ numpy==1.21.0
 pandas==1.2.5
 scikit_learn==0.24.2
 yfinance==0.1.59
-boto3==1.17.49
-botocore==1.20.49
-awslambdaric==2.0.0
-TA-Lib==0.4.0  # ✅ Added for technical indicators
