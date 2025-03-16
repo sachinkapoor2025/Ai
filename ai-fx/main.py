@@ -3,7 +3,7 @@ import boto3
 import tpqoa
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 from decimal import Decimal  # ✅ Import Decimal for DynamoDB compatibility
 import pandas_ta as ta  # ✅ Using pandas_ta instead of TA-Lib
@@ -55,12 +55,18 @@ def fetch_market_data(oanda, instrument, granularity="M1", price="M"):
     """ Fetch historical market data from OANDA for the given instrument. """
     print(f"[INFO] Fetching market data for {instrument}...")
 
-    # ✅ Correct `get_history()` call by adding `price="M"` parameter
+    # ✅ Correct timestamp format (ISO 8601, UTC, with "Z" suffix)
+    start_time = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec='seconds').replace("+00:00", "Z")
+    end_time = datetime.now(timezone.utc).isoformat(timespec='seconds').replace("+00:00", "Z")
+
+    print(f"[INFO] Fetching data from {start_time} to {end_time}")
+
+    # ✅ Corrected API request with properly formatted timestamps
     data = oanda.get_history(
         instrument=instrument,
         granularity=granularity,
-        start=(datetime.utcnow() - timedelta(days=1)).isoformat(),
-        end=datetime.utcnow().isoformat(),
+        start=start_time,
+        end=end_time,
         price=price  # ✅ Added price parameter (Mid Prices)
     )
 
