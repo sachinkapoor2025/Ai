@@ -1,25 +1,6 @@
 # Use Python base image
 FROM python:3.9
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    python3-dev \
-    libffi-dev \
-    libssl-dev \
-    wget \
-    tar \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install TA-Lib using a reliable source
-RUN wget https://github.com/TA-Lib/ta-lib/archive/refs/tags/0.4.0.tar.gz -O /tmp/ta-lib.tar.gz \
-    && tar -xzf /tmp/ta-lib.tar.gz -C /tmp/ \
-    && cd /tmp/ta-lib-0.4.0/ \
-    && ./configure --prefix=/usr \
-    && make \
-    && make install \
-    && rm -rf /tmp/ta-lib*
-        
 # Set working directory
 WORKDIR /app
 

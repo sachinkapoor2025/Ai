@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 from decimal import Decimal  # ✅ Import Decimal for DynamoDB compatibility
-import talib  # ✅ Technical Indicators Library
+import pandas_ta as ta  # ✅ Using pandas_ta instead of TA-Lib
 
 # Initialize AWS Clients
 dynamodb = boto3.client('dynamodb')
@@ -62,10 +62,10 @@ def fetch_market_data(oanda, instrument, granularity="M1", count=100):
     return df
 
 def calculate_technical_indicators(df):
-    """ Calculate key technical indicators and return as a dictionary. """
+    """ Calculate key technical indicators using pandas_ta and return as a dictionary. """
     print("[INFO] Calculating technical indicators...")
 
-    # Convert prices to numpy arrays for TA-Lib calculations
+    # Convert prices to float
     df["close"] = df["closeMid"].astype(float)
     df["high"] = df["highMid"].astype(float)
     df["low"] = df["lowMid"].astype(float)
@@ -74,22 +74,22 @@ def calculate_technical_indicators(df):
     indicators = {}
 
     # Moving Averages
-    indicators["SMA_20"] = talib.SMA(df["close"], timeperiod=20)[-1]
-    indicators["SMA_50"] = talib.SMA(df["close"], timeperiod=50)[-1]
-    indicators["EMA_20"] = talib.EMA(df["close"], timeperiod=20)[-1]
+    indicators["SMA_20"] = df.ta.sma(length=20).iloc[-1]
+    indicators["SMA_50"] = df.ta.sma(length=50).iloc[-1]
+    indicators["EMA_20"] = df.ta.ema(length=20).iloc[-1]
 
     # RSI (Relative Strength Index)
-    indicators["RSI_14"] = talib.RSI(df["close"], timeperiod=14)[-1]
+    indicators["RSI_14"] = df.ta.rsi(length=14).iloc[-1]
 
     # MACD (Moving Average Convergence Divergence)
-    macd, macdsignal, macdhist = talib.MACD(df["close"], fastperiod=12, slowperiod=26, signalperiod=9)
-    indicators["MACD"] = macd[-1]
-    indicators["MACD_Signal"] = macdsignal[-1]
+    macd_df = df.ta.macd(fast=12, slow=26, signal=9)
+    indicators["MACD"] = macd_df["MACD_12_26_9"].iloc[-1]
+    indicators["MACD_Signal"] = macd_df["MACDs_12_26_9"].iloc[-1]
 
     # Bollinger Bands
-    upper, middle, lower = talib.BBANDS(df["close"], timeperiod=20)
-    indicators["BB_Upper"] = upper[-1]
-    indicators["BB_Lower"] = lower[-1]
+    bb_df = df.ta.bbands(length=20)
+    indicators["BB_Upper"] = bb_df["BBU_20_2.0"].iloc[-1]
+    indicators["BB_Lower"] = bb_df["BBL_20_2.0"].iloc[-1]
 
     return indicators
 
